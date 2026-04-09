@@ -24,6 +24,7 @@ const state = {
   bullets: [],
   enemies: [],
   powers: [],
+  explosions: [],
   pressed: new Set(),
   pointerDown: false,
   pointerOffsetX: 0,
@@ -100,6 +101,7 @@ function startGame() {
   state.bullets = [];
   state.enemies = [];
   state.powers = [];
+  state.explosions = [];
   player.x = WIDTH / 2 - player.w / 2;
   player.y = HEIGHT - 100;
   player.hp = 3;
@@ -131,6 +133,7 @@ function gameLoop(timestamp) {
 
 function update(delta) {
   animateStars(delta);
+  updateExplosions(delta);
 
   if (!state.running) return;
 
@@ -281,6 +284,16 @@ function resolveCollisions() {
       if (enemy.hp <= 0) {
         enemy.dead = true;
         state.score += enemy.score;
+        createExplosion(enemy.x + enemy.w / 2, enemy.y + enemy.h / 2, {
+          count: enemy.kind === "heavy" ? 28 : 16,
+          sizeMin: enemy.kind === "heavy" ? 3 : 2,
+          sizeMax: enemy.kind === "heavy" ? 8 : 5,
+          speedMin: enemy.kind === "heavy" ? 70 : 55,
+          speedMax: enemy.kind === "heavy" ? 290 : 220,
+          lifeMin: enemy.kind === "heavy" ? 420 : 300,
+          lifeMax: enemy.kind === "heavy" ? 760 : 560,
+          colors: enemy.kind === "heavy" ? ["#ffd2a0", "#ff9d6b", "#ff6f4d"] : ["#ffd7ea", "#ff8eb2", "#ff6c8b"],
+        });
       }
       break;
     }
@@ -292,6 +305,16 @@ function resolveCollisions() {
   for (const enemy of state.enemies) {
     if (overlap(player, enemy)) {
       enemy.dead = true;
+      createExplosion(enemy.x + enemy.w / 2, enemy.y + enemy.h / 2, {
+        count: enemy.kind === "heavy" ? 22 : 14,
+        sizeMin: 2,
+        sizeMax: 7,
+        speedMin: 70,
+        speedMax: 250,
+        lifeMin: 260,
+        lifeMax: 520,
+        colors: ["#ffe3b8", "#ff9d6b", "#f95272"],
+      });
       hurtPlayer();
     }
   }
@@ -302,9 +325,29 @@ function resolveCollisions() {
     power.used = true;
     if (power.type === "heal") {
       player.hp = Math.min(5, player.hp + 1);
+      createExplosion(power.x, power.y, {
+        count: 10,
+        sizeMin: 2,
+        sizeMax: 4,
+        speedMin: 45,
+        speedMax: 150,
+        lifeMin: 220,
+        lifeMax: 420,
+        colors: ["#79e6b2", "#bff6de", "#dfffee"],
+      });
     } else {
       player.doubleShot = true;
       player.fireCooldown = 120;
+      createExplosion(power.x, power.y, {
+        count: 12,
+        sizeMin: 2,
+        sizeMax: 5,
+        speedMin: 50,
+        speedMax: 170,
+        lifeMin: 240,
+        lifeMax: 450,
+        colors: ["#b998ff", "#d9c7ff", "#f1ebff"],
+      });
       setTimeout(() => {
         player.doubleShot = false;
         player.fireCooldown = 180;
@@ -317,6 +360,16 @@ function resolveCollisions() {
 function hurtPlayer() {
   player.hp -= 1;
   player.hitFlash = 180;
+  createExplosion(player.x + player.w / 2, player.y + player.h / 2, {
+    count: 20,
+    sizeMin: 2,
+    sizeMax: 7,
+    speedMin: 80,
+    speedMax: 300,
+    lifeMin: 260,
+    lifeMax: 520,
+    colors: ["#ffb3b3", "#ff8e8e", "#ff6b6b", "#ffdca8"],
+  });
   if (player.hp <= 0) {
     player.hp = 0;
     gameOver();
@@ -330,6 +383,7 @@ function render() {
   drawBullets();
   drawEnemies();
   drawPowers();
+  drawExplosions();
 }
 
 function buildStars() {
@@ -428,6 +482,60 @@ function drawPowers() {
   }
 }
 
+function createExplosion(x, y, options) {
+  const {
+    count = 14,
+    sizeMin = 2,
+    sizeMax = 5,
+    speedMin = 60,
+    speedMax = 240,
+    lifeMin = 260,
+    lifeMax = 560,
+    colors = ["#ffe7a3", "#ff9f7a", "#ff5d70"],
+  } = options || {};
+
+  for (let i = 0; i < count; i += 1) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = rand(speedMin, speedMax);
+    const life = rand(lifeMin, lifeMax);
+    state.explosions.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: rand(sizeMin, sizeMax),
+      drag: rand(0.88, 0.96),
+      gravity: rand(18, 50),
+      life,
+      maxLife: life,
+      color: colors[Math.floor(rand(0, colors.length))],
+    });
+  }
+}
+
+function updateExplosions(delta) {
+  const dt = delta / 1000;
+  for (const particle of state.explosions) {
+    particle.life -= delta;
+    particle.vx *= particle.drag;
+    particle.vy = particle.vy * particle.drag + particle.gravity * dt;
+    particle.x += particle.vx * dt;
+    particle.y += particle.vy * dt;
+    particle.size *= 0.995;
+  }
+  state.explosions = state.explosions.filter((particle) => particle.life > 0 && particle.size > 0.25);
+}
+
+function drawExplosions() {
+  for (const particle of state.explosions) {
+    const alpha = clamp(particle.life / particle.maxLife, 0, 1);
+    ctx.fillStyle = hexToRgba(particle.color, alpha);
+    ctx.beginPath();
+    ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 function updateHud() {
   scoreEl.textContent = String(state.score);
   hpEl.textContent = String(player.hp);
@@ -477,4 +585,14 @@ function rand(min, max) {
 
 function escapeHtml(text) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function hexToRgba(hex, alpha) {
+  const raw = hex.replace("#", "");
+  const value = raw.length === 3 ? raw.split("").map((ch) => ch + ch).join("") : raw;
+  const int = Number.parseInt(value, 16);
+  const r = (int >> 16) & 255;
+  const g = (int >> 8) & 255;
+  const b = int & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
