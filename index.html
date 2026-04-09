@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>飞机大战</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="game-page">
+      <header class="hud">
+        <div class="hud-item">分数: <span id="score">0</span></div>
+        <div class="hud-item">生命: <span id="hp">3</span></div>
+        <div class="hud-item">最高分: <span id="best">0</span></div>
+      </header>
+
+      <section class="game-shell">
+        <canvas id="gameCanvas" width="480" height="720" aria-label="飞机大战画布"></canvas>
+
+        <div id="overlay" class="overlay visible">
+          <h1>飞机大战</h1>
+          <p class="tip">
+            键盘: WASD / 方向键移动，空格发射
+            <br />
+            鼠标或手指: 拖动飞机移动
+          </p>
+          <button id="startBtn" type="button">开始游戏</button>
+        </div>
+      </section>
+
+      <footer class="help">
+        <p>提示: 击毁敌机得分，敌机穿越底部或撞到你会掉血。生命归零游戏结束。</p>
+      </footer>
+    </main>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
